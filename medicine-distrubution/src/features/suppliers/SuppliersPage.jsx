@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient.js';
 import DataTable from '../../components/common/DataTable.jsx';
+import { usePopup } from '../../components/ui/PopupContext.jsx';
 
 const emptySupplier = {
   name: '',
@@ -11,17 +12,27 @@ const emptySupplier = {
 };
 
 const SuppliersPage = () => {
+  const { showPopup } = usePopup();
   const [suppliers, setSuppliers] = useState([]);
   const [form, setForm] = useState(emptySupplier);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // ✅ Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const loadSuppliers = async () => {
     try {
+      setLoading(true);
       const res = await axiosClient.get('/suppliers');
       setSuppliers(res.data?.data || []);
+      setCurrentPage(1); // reset to first page when reloading
     } catch (err) {
       console.error(err);
       alert('Failed to load suppliers');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,7 +80,11 @@ const SuppliersPage = () => {
       await loadSuppliers();
     } catch (err) {
       console.error(err);
-      alert('Failed to save supplier');
+      showPopup({
+        type: 'error',
+        title: 'Supplier Save Failed',
+        message: 'Failed to save supplier. Please try again.'
+      });
     }
   };
 
@@ -107,6 +122,22 @@ const SuppliersPage = () => {
       )
     }
   ];
+
+  // ✅ Pagination calculations
+  const totalItems = suppliers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedSuppliers = suppliers.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  };
 
   return (
     <main className="space-y-4">
@@ -196,7 +227,44 @@ const SuppliersPage = () => {
       </section>
 
       <section aria-label="Suppliers list">
-        <DataTable columns={columns} data={suppliers} />
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading suppliers…</p>
+        ) : (
+          <>
+            <DataTable columns={columns} data={paginatedSuppliers} />
+
+            {totalItems > 0 && (
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-600">
+                <span>
+                  Showing{' '}
+                  {totalItems === 0 ? 0 : startIndex + 1}–
+                  {Math.min(endIndex, totalItems)} of {totalItems}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+                    disabled={safePage === 1}
+                    className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span>
+                    Page {safePage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+                    disabled={safePage === totalPages}
+                    className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </section>
     </main>
   );

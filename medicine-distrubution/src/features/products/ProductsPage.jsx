@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient.js';
 import DataTable from '../../components/common/DataTable.jsx';
+import { usePopup } from '../../components/ui/PopupContext'; // 👈 import popup hook
 
 const emptyProduct = {
   product_name: '',
@@ -17,19 +18,31 @@ const emptyProduct = {
 };
 
 const ProductsPage = () => {
+  const { showPopup } = usePopup(); // 👈 get popup functions
+
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const loadProducts = async () => {
     setLoading(true);
     try {
       const res = await axiosClient.get('/products');
-      setProducts(res.data?.data || []);
+      const list = res.data?.data || [];
+      setProducts(list);
+      setCurrentPage(1);
     } catch (err) {
       console.error(err);
-      alert('Failed to load products');
+      showPopup({
+        type: 'error',
+        title: 'Load Failed',
+        message: 'Failed to load products. Please try again.'
+      });
     } finally {
       setLoading(false);
     }
@@ -76,9 +89,18 @@ const ProductsPage = () => {
     try {
       await axiosClient.delete(`/products/${id}`);
       await loadProducts();
+      showPopup({
+        type: 'success',
+        title: 'Product Deleted',
+        message: 'The product has been deleted successfully.'
+      });
     } catch (err) {
       console.error(err);
-      alert('Failed to delete product');
+      showPopup({
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Failed to delete product. Please try again.'
+      });
     }
   };
 
@@ -87,24 +109,43 @@ const ProductsPage = () => {
     try {
       if (editingId) {
         await axiosClient.put(`/products/${editingId}`, form);
+        showPopup({
+          type: 'success',
+          title: 'Product Updated',
+          message: 'Product details have been updated.'
+        });
       } else {
         await axiosClient.post('/products', form);
+        showPopup({
+          type: 'success',
+          title: 'Product Added',
+          message: 'New product has been added.'
+        });
       }
       setForm(emptyProduct);
       setEditingId(null);
       await loadProducts();
     } catch (err) {
       console.error(err);
-      alert('Failed to save product');
+      showPopup({
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save product. Please check the data and try again.'
+      });
     }
   };
 
   const columns = [
+    { key: 'id', label: 'ID' },
     { key: 'product_name', label: 'Product' },
     { key: 'generic_name', label: 'Generic' },
-    { key: 'form', label: 'Form' },
     { key: 'strength', label: 'Strength' },
+    { key: 'form', label: 'Form' },
+    { key: 'packing', label: 'Packing' },
+    { key: 'barcode', label: 'Barcode' },
     { key: 'mrp', label: 'MRP' },
+    { key: 'purchase_price', label: 'Purchase Price' },
+    { key: 'selling_price', label: 'Selling Price' },
     {
       key: 'actions',
       label: 'Actions',
@@ -134,6 +175,22 @@ const ProductsPage = () => {
       )
     }
   ];
+
+  // Pagination calculations
+  const totalItems = products.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedProducts = products.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  };
 
   return (
     <main className="space-y-4">
@@ -314,7 +371,39 @@ const ProductsPage = () => {
         {loading ? (
           <p className="text-sm text-slate-500">Loading products…</p>
         ) : (
-          <DataTable columns={columns} data={products} />
+          <>
+            <DataTable columns={columns} data={paginatedProducts} />
+
+            {totalItems > 0 && (
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-600">
+                <span>
+                  Showing {totalItems === 0 ? 0 : startIndex + 1}–
+                  {Math.min(endIndex, totalItems)} of {totalItems}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+                    disabled={safePage === 1}
+                    className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span>
+                    Page {safePage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+                    disabled={safePage === totalPages}
+                    className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

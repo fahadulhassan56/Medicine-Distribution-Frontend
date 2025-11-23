@@ -1,7 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient.js';
+import { usePopup } from '../../components/ui/PopupContext'; // 👈 import popup hook
 
 const InvoicesPage = () => {
+  const { showPopup } = usePopup(); // 👈 get showPopup
+
   const [salesId, setSalesId] = useState('');
   const [purchaseId, setPurchaseId] = useState('');
 
@@ -11,17 +14,19 @@ const InvoicesPage = () => {
   const [salesList, setSalesList] = useState([]);
   const [purchaseList, setPurchaseList] = useState([]);
 
-  // Hidden iframe refs for printing
-  const salesIframe = useRef(null);
-  const purchaseIframe = useRef(null);
+  // ---------------------- LOAD SALES & PURCHASES ----------------------
 
-  // AUTO-LOAD sales & purchases list
   const loadSales = async () => {
     try {
       const res = await axiosClient.get('/sales');
       setSalesList(res.data?.data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load sales list', err);
+      showPopup({
+        type: 'error',
+        title: 'Load Failed',
+        message: 'Unable to load sales list. Please try again.',
+      });
     }
   };
 
@@ -30,7 +35,12 @@ const InvoicesPage = () => {
       const res = await axiosClient.get('/purchases');
       setPurchaseList(res.data?.data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load purchases list', err);
+      showPopup({
+        type: 'error',
+        title: 'Load Failed',
+        message: 'Unable to load purchases list. Please try again.',
+      });
     }
   };
 
@@ -39,169 +49,278 @@ const InvoicesPage = () => {
     loadPurchases();
   }, []);
 
+  // ---------------------- BUILD VIEW URLS ----------------------
+
   const openSalesInvoice = () => {
-    if (!salesId) return;
+    if (!salesId) {
+      showPopup({
+        type: 'warning',
+        title: 'No Sale Selected',
+        message: 'Please select a sale or enter a Sales ID first.',
+      });
+      return;
+    }
     const url = axiosClient.defaults.baseURL + `/invoices/sales/${salesId}`;
     setSalesUrl(url);
+    showPopup({
+      type: 'info',
+      title: 'Link Generated',
+      message: 'Sales invoice link is ready. You can open it in a new tab.',
+    });
   };
 
   const openPurchaseInvoice = () => {
-    if (!purchaseId) return;
+    if (!purchaseId) {
+      showPopup({
+        type: 'warning',
+        title: 'No Purchase Selected',
+        message: 'Please select a purchase or enter a Purchase ID first.',
+      });
+      return;
+    }
     const url = axiosClient.defaults.baseURL + `/invoices/purchase/${purchaseId}`;
     setPurchaseUrl(url);
+    showPopup({
+      type: 'info',
+      title: 'Link Generated',
+      message: 'Purchase invoice link is ready. You can open it in a new tab.',
+    });
   };
 
-  const printSalesInvoice = () => {
-    if (!salesUrl) return;
-    salesIframe.current.src = salesUrl;
-    salesIframe.current.onload = () => {
-      salesIframe.current.contentWindow.print();
-    };
+  // ---------------------- DOWNLOAD PDF HELPERS ----------------------
+
+  const downloadBlobPdf = async (endpoint, filename) => {
+    try {
+      const res = await axiosClient.get(endpoint, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      showPopup({
+        type: 'success',
+        title: 'Download Started',
+        message: `${filename} is downloading.`,
+      });
+    } catch (err) {
+      console.error('Failed to download PDF', err);
+      showPopup({
+        type: 'error',
+        title: 'Download Failed',
+        message: 'Failed to download invoice PDF. Please try again.',
+      });
+    }
   };
 
-  const printPurchaseInvoice = () => {
-    if (!purchaseUrl) return;
-    purchaseIframe.current.src = purchaseUrl;
-    purchaseIframe.current.onload = () => {
-      purchaseIframe.current.contentWindow.print();
-    };
+  const downloadSalesInvoice = async () => {
+    if (!salesId) {
+      showPopup({
+        type: 'warning',
+        title: 'No Sale Selected',
+        message: 'Please select a sale or enter a Sales ID first.',
+      });
+      return;
+    }
+    await downloadBlobPdf(`/invoices/sales/${salesId}`, `sales-invoice-${salesId}.pdf`);
   };
+
+  const downloadPurchaseInvoice = async () => {
+    if (!purchaseId) {
+      showPopup({
+        type: 'warning',
+        title: 'No Purchase Selected',
+        message: 'Please select a purchase or enter a Purchase ID first.',
+      });
+      return;
+    }
+    await downloadBlobPdf(
+      `/invoices/purchase/${purchaseId}`,
+      `purchase-invoice-${purchaseId}.pdf`
+    );
+  };
+
+  // ---------------------- RENDER ----------------------
 
   return (
     <main className="space-y-4">
       <header>
         <h2 className="text-xl font-semibold text-slate-900">Invoices</h2>
         <p className="text-sm text-slate-600">
-          Open & print sales and purchase invoice PDFs generated by the API.
+          Open and download sales & purchase invoice PDFs generated by the API.
         </p>
       </header>
 
-      {/* Hidden iframes for printing */}
-      <iframe ref={salesIframe} style={{ display: 'none' }} title="sales-pdf"></iframe>
-      <iframe ref={purchaseIframe} style={{ display: 'none' }} title="purchase-pdf"></iframe>
-
       <section className="grid gap-4 md:grid-cols-2">
-
-        {/* SALES INVOICE SECTION */}
-        <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-2">
-          <header className="flex items-center justify-between mb-2">
+        {/* ---------------------- SALES INVOICE SECTION ---------------------- */}
+        <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+          <header className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-slate-800">Sales Invoice PDF</h3>
           </header>
 
-          <label className="text-xs font-medium text-slate-700">Select Sales</label>
-          <select
-            value={salesId}
-            onChange={(e) => setSalesId(e.target.value)}
-            className="w-full text-xs border rounded px-2 py-1"
-          >
-            <option value="">Select Sale (optional)</option>
-            {salesList.map((s) => (
-              <option key={s.id} value={s.id}>
-                #{s.id} — {s.customer_id ? `Customer ${s.customer_id}` : 'Sale'} — {s.invoice_date}
-              </option>
-            ))}
-          </select>
-
+          {/* SELECT FROM LIST */}
           <div>
-            <label className="text-xs font-medium text-slate-700">OR Enter Sales ID</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              Select Sale
+            </label>
+            <select
+              value={salesId}
+              onChange={(e) => setSalesId(e.target.value)}
+              className="w-full text-xs border rounded px-2 py-1"
+            >
+              <option value="">Select Sale (optional)</option>
+              {salesList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  #{s.id} —{' '}
+                  {s.customer?.name
+                    ? s.customer.name
+                    : s.customer_id
+                    ? `Customer ${s.customer_id}`
+                    : 'Sale'}{' '}
+                  — {s.invoice_date}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* OR ENTER ID */}
+          <div>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              OR Enter Sales ID
+            </label>
             <input
               type="number"
               placeholder="Sales ID"
               value={salesId}
               onChange={(e) => setSalesId(e.target.value)}
-              className="w-full text-xs border rounded px-2 py-1 mt-1"
+              className="w-full text-xs border rounded px-2 py-1"
             />
           </div>
 
-          <button
-            type="button"
-            onClick={openSalesInvoice}
-            className="text-xs px-3 py-1 rounded-md border border-slate-300 mt-2"
-          >
-            Generate Link
-          </button>
+          {/* ACTIONS */}
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <button
+              type="button"
+              onClick={openSalesInvoice}
+              className="text-xs px-3 py-1 rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+              disabled={!salesId}
+            >
+              Generate View Link
+            </button>
 
+            <button
+              type="button"
+              onClick={downloadSalesInvoice}
+              className="text-xs px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              disabled={!salesId}
+            >
+              Download / Print PDF
+            </button>
+          </div>
+
+          {/* VIEW LINK */}
           {salesUrl && (
-            <div className="flex gap-3 mt-2 text-xs">
+            <div className="mt-2 text-xs">
               <a
                 href={salesUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-blue-600 underline"
               >
-                Open Sales Invoice PDF
+                Open Sales Invoice PDF in new tab
               </a>
-
-              <button
-                onClick={printSalesInvoice}
-                className="px-2 py-1 border rounded text-slate-700 hover:bg-slate-100"
-              >
-                Print PDF
-              </button>
             </div>
           )}
         </section>
 
-        {/* PURCHASE INVOICE SECTION */}
-        <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-2">
-          <header className="flex items-center justify-between mb-2">
+        {/* ---------------------- PURCHASE INVOICE SECTION ---------------------- */}
+        <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+          <header className="flex items-center justify-between mb-1">
             <h3 className="text-sm font-semibold text-slate-800">Purchase Invoice PDF</h3>
           </header>
 
-          <label className="text-xs font-medium text-slate-700">Select Purchase</label>
-          <select
-            value={purchaseId}
-            onChange={(e) => setPurchaseId(e.target.value)}
-            className="w-full text-xs border rounded px-2 py-1"
-          >
-            <option value="">Select Purchase (optional)</option>
-            {purchaseList.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} — Supplier {p.supplier_id} — {p.invoice_no}
-              </option>
-            ))}
-          </select>
-
+          {/* SELECT FROM LIST */}
           <div>
-            <label className="text-xs font-medium text-slate-700">OR Enter Purchase ID</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              Select Purchase
+            </label>
+            <select
+              value={purchaseId}
+              onChange={(e) => setPurchaseId(e.target.value)}
+              className="w-full text-xs border rounded px-2 py-1"
+            >
+              <option value="">Select Purchase (optional)</option>
+              {purchaseList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  #{p.id} —{' '}
+                  {p.supplier?.name
+                    ? p.supplier.name
+                    : p.supplier_id
+                    ? `Supplier ${p.supplier_id}`
+                    : 'Purchase'}{' '}
+                  — {p.invoice_no}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* OR ENTER ID */}
+          <div>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              OR Enter Purchase ID
+            </label>
             <input
               type="number"
               placeholder="Purchase ID"
               value={purchaseId}
               onChange={(e) => setPurchaseId(e.target.value)}
-              className="w-full text-xs border rounded px-2 py-1 mt-1"
+              className="w-full text-xs border rounded px-2 py-1"
             />
           </div>
 
-          <button
-            type="button"
-            onClick={openPurchaseInvoice}
-            className="text-xs px-3 py-1 rounded-md border border-slate-300 mt-2"
-          >
-            Generate Link
-          </button>
+          {/* ACTIONS */}
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <button
+              type="button"
+              onClick={openPurchaseInvoice}
+              className="text-xs px-3 py-1 rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+              disabled={!purchaseId}
+            >
+              Generate View Link
+            </button>
 
+            <button
+              type="button"
+              onClick={downloadPurchaseInvoice}
+              className="text-xs px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              disabled={!purchaseId}
+            >
+              Download / Print PDF
+            </button>
+          </div>
+
+          {/* VIEW LINK */}
           {purchaseUrl && (
-            <div className="flex gap-3 mt-2 text-xs">
+            <div className="mt-2 text-xs">
               <a
                 href={purchaseUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-blue-600 underline"
               >
-                Open Purchase Invoice PDF
+                Open Purchase Invoice PDF in new tab
               </a>
-
-              <button
-                onClick={printPurchaseInvoice}
-                className="px-2 py-1 border rounded text-slate-700 hover:bg-slate-100"
-              >
-                Print PDF
-              </button>
             </div>
           )}
         </section>
-
       </section>
     </main>
   );

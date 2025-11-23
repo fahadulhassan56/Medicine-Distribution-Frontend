@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient.js';
 import DataTable from '../../components/common/DataTable.jsx';
+import { usePopup } from '../../components/ui/PopupContext.jsx';
 
 const defaultSale = {
   customer_id: '',
@@ -17,6 +18,7 @@ const defaultSale = {
 };
 
 const SalesPage = () => {
+  const { showPopup } = usePopup();
   const [sales, setSales] = useState([]);
   const [sale, setSale] = useState(defaultSale);
   const [selected, setSelected] = useState(null);
@@ -31,7 +33,11 @@ const SalesPage = () => {
       setSales(res.data?.data || []);
     } catch (err) {
       console.error(err);
-      alert('Failed to load sales');
+      showPopup({
+        type: 'error',
+        title: 'Sales Load Failed',
+        message: 'Failed to load sales. Please try again.'
+      });
     }
   };
 
@@ -123,7 +129,11 @@ const SalesPage = () => {
       await loadSales();
     } catch (err) {
       console.error(err);
-      alert('Failed to create sale');
+      showPopup({
+        type: 'error',
+        title: 'Sale Creation Failed',
+        message: 'Failed to create sale. Please try again.'
+      });
     }
   };
 
@@ -136,11 +146,34 @@ const SalesPage = () => {
     }
   };
 
+  // 🔥 Expanded table columns to show more fields from your sample
   const columns = [
     { key: 'id', label: 'ID' },
-    { key: 'customer_id', label: 'Customer ID' },
-    { key: 'invoice_date', label: 'Invoice Date' },
-    { key: 'total_amount', label: 'Total' }
+    {
+      key: 'customer_name',
+      label: 'Customer',
+      render: (_, row) => row.customer?.name || `ID ${row.customer_id}`
+    },
+    {
+      key: 'customer_phone',
+      label: 'Phone',
+      render: (_, row) => row.customer?.phone || '—'
+    },
+    {
+      key: 'invoice_date',
+      label: 'Invoice Date'
+    },
+    {
+      key: 'net_total',
+      label: 'Net Total',
+      render: (_, row) => row.net_total ?? row.total_amount
+    },
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      render: (_, row) =>
+        row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'
+    }
   ];
 
   const detail = selected || null;
@@ -336,18 +369,26 @@ const SalesPage = () => {
           {/* BASIC INFO */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <h4 className="text-xs uppercase text-slate-500 font-semibold">Invoice Date</h4>
+              <h4 className="text-xs uppercase text-slate-500 font-semibold">
+                Invoice Date
+              </h4>
               <p className="text-sm font-medium">{detail.invoice_date}</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <h4 className="text-xs uppercase text-slate-500 font-semibold">Customer ID</h4>
+              <h4 className="text-xs uppercase text-slate-500 font-semibold">
+                Customer ID
+              </h4>
               <p className="text-sm font-medium">{detail.customer_id}</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <h4 className="text-xs uppercase text-slate-500 font-semibold">Total Amount</h4>
-              <p className="text-sm font-medium text-green-600">Rs. {detail.total_amount}</p>
+              <h4 className="text-xs uppercase text-slate-500 font-semibold">
+                Total Amount
+              </h4>
+              <p className="text-sm font-medium text-green-600">
+                Rs. {detail.net_total ?? detail.total_amount}
+              </p>
             </div>
           </div>
 
@@ -365,8 +406,10 @@ const SalesPage = () => {
                   <p className="text-sm font-medium">{detail.customer.phone}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase">Email</p>
-                  <p className="text-sm font-medium">{detail.customer.email}</p>
+                  <p className="text-xs text-slate-500 uppercase">License No</p>
+                  <p className="text-sm font-medium">
+                    {detail.customer.license_no || '—'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase">Address</p>

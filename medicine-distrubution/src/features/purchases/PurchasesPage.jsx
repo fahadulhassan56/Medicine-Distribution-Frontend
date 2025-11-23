@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient.js';
 import DataTable from '../../components/common/DataTable.jsx';
+import { usePopup } from '../../components/ui/PopupContext'; // 👈 popup hook
 
 const defaultPurchase = {
   supplier_id: '',
@@ -20,9 +21,15 @@ const defaultPurchase = {
 };
 
 const PurchasesPage = () => {
+  const { showPopup } = usePopup(); // 👈 get popup helpers
+
   const [purchases, setPurchases] = useState([]);
   const [purchase, setPurchase] = useState(defaultPurchase);
   const [selected, setSelected] = useState(null);
+
+  // Lookups
+  const [suppliers, setSuppliers] = useState([]);
+  const [products, setProducts] = useState([]);
 
   const loadPurchases = async () => {
     try {
@@ -30,12 +37,36 @@ const PurchasesPage = () => {
       setPurchases(res.data?.data || []);
     } catch (err) {
       console.error(err);
-      alert('Failed to load purchases');
+      showPopup({
+        type: 'error',
+        title: 'Load Failed',
+        message: 'Failed to load purchases. Please try again.'
+      });
+    }
+  };
+
+  const loadLookups = async () => {
+    try {
+      const [supRes, prodRes] = await Promise.all([
+        axiosClient.get('/suppliers'),
+        axiosClient.get('/products')
+      ]);
+
+      setSuppliers(supRes.data?.data || []);
+      setProducts(prodRes.data?.data || []);
+    } catch (err) {
+      console.error('Failed to load suppliers/products:', err);
+      showPopup({
+        type: 'error',
+        title: 'Lookup Failed',
+        message: 'Unable to load suppliers/products. Some fields may not work correctly.'
+      });
     }
   };
 
   useEffect(() => {
     loadPurchases();
+    loadLookups();
   }, []);
 
   const handlePurchaseChange = (e) => {
@@ -108,32 +139,74 @@ const PurchasesPage = () => {
       };
 
       await axiosClient.post('/purchases', payload);
+
+      showPopup({
+        type: 'success',
+        title: 'Purchase Saved',
+        message: 'Purchase has been recorded successfully.'
+      });
+
       setPurchase(defaultPurchase);
       await loadPurchases();
     } catch (err) {
       console.error(err);
-      alert('Failed to create purchase');
+      showPopup({
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to create purchase. Please check the data and try again.'
+      });
     }
   };
 
   const handleSelectPurchase = async (row) => {
     try {
       const res = await axiosClient.get(`/purchases/${row.id}`);
-      // backend: { success, message, data: { ...purchase } }
       setSelected(res.data?.data || res.data);
     } catch (err) {
       console.error(err);
+      showPopup({
+        type: 'error',
+        title: 'Load Failed',
+        message: 'Failed to load purchase details.'
+      });
     }
   };
 
+  // Expanded table columns to show more info (supplier + createdAt)
   const columns = [
     { key: 'id', label: 'ID' },
     { key: 'invoice_no', label: 'Invoice No' },
     { key: 'invoice_date', label: 'Invoice Date' },
-    { key: 'total_amount', label: 'Total Amount' }
+    {
+      key: 'supplier_name',
+      label: 'Supplier',
+      render: (_, row) => row.supplier?.name || `ID ${row.supplier_id}`
+    },
+    {
+      key: 'supplier_phone',
+      label: 'Phone',
+      render: (_, row) => row.supplier?.phone || '—'
+    },
+    {
+      key: 'supplier_gst',
+      label: 'GST No',
+      render: (_, row) => row.supplier?.gst_no || '—'
+    },
+    {
+      key: 'total_amount',
+      label: 'Total Amount'
+    },
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      render: (_, row) =>
+        row.createdAt
+          ? new Date(row.createdAt).toLocaleString()
+          : '—'
+    }
   ];
 
-  // normalize selected detail (whether it's wrapper or raw)
+  // normalize selected detail
   const detail = selected || null;
 
   return (
@@ -154,16 +227,22 @@ const PurchasesPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">
-                Supplier ID
+                Supplier
               </label>
-              <input
+              <select
                 name="supplier_id"
-                type="number"
-                value={purchase.supplier_id}
+                value={purchase.supplier_id === '' ? '' : String(purchase.supplier_id)}
                 onChange={handlePurchaseChange}
                 required
                 className="w-full"
-              />
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.phone})
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">
@@ -225,16 +304,22 @@ const PurchasesPage = () => {
               >
                 <div>
                   <label className="text-[11px] font-medium text-slate-600 block mb-1">
-                    Product ID
+                    Product
                   </label>
-                  <input
+                  <select
                     name="product_id"
-                    type="number"
-                    value={item.product_id}
+                    value={item.product_id === '' ? '' : String(item.product_id)}
                     onChange={(e) => handleItemChange(idx, e)}
                     className="w-full"
                     required
-                  />
+                  >
+                    <option value="">Select product</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.product_name} {p.form ? `(${p.form})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-slate-600 block mb-1">
@@ -335,7 +420,7 @@ const PurchasesPage = () => {
         />
       </section>
 
-      {/* MODERN PURCHASE DETAIL CARD */}
+      {/* PURCHASE DETAIL CARD */}
       {detail && (
         <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
           <header className="border-b pb-3">
@@ -452,9 +537,7 @@ const PurchasesPage = () => {
                         Rs. {item.product?.mrp}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        Rs.{' '}
-                        {Number(item.quantity || 0) *
-                          Number(item.cost_price || 0)}
+                        Rs. {Number(item.quantity || 0) * Number(item.cost_price || 0)}
                       </td>
                     </tr>
                   ))}
