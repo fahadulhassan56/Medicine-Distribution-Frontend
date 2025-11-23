@@ -1,0 +1,61 @@
+/* Ensure full-height so the gradient background looks correct */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Smooth entrance for the card */
+.max-w-md {
+  animation: login-fade-in-up 0.35s ease-out;
+}
+
+@keyframes login-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Inputs inside the login card */
+.max-w-md input[type="email"],
+.max-w-md input[type="password"],
+.max-w-md input[type="text"] {
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;           /* slate-200 */
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;                  /* text-sm */
+  background-color: #f9fafb;            /* slate-50 */
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.max-w-md input[type="email"]:focus,
+.max-w-md input[type="password"]:focus,
+.max-w-md input[type="text"]:focus {
+  border-color: #2563eb;                /* blue-600 */
+  box-shadow: 0 0 0 1px #2563eb1a,
+              0 0 0 4px #2563eb1a;      /* subtle focus ring */
+  background-color: #ffffff;
+}
+
+/* Disabled state for the submit button (you already set disabled in JSX) */
+.max-w-md button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Small screens: slightly reduce padding so it fits comfortably */
+@media (max-width: 480px) {
+  .max-w-md {
+    margin: 0 1rem;
+    padding: 1.5rem;
+  }
+}

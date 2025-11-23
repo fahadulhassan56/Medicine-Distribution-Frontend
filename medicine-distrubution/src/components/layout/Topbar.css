@@ -1,0 +1,218 @@
+/* ROOT TOPBAR CONTAINER */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+/* INNER LAYOUT */
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 1rem;
+  height: 4rem;
+  max-width: 100%;
+  margin-inline: auto;
+  gap: 1rem;
+}
+
+/* LEFT: BRAND AREA */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0; /* allow text to shrink responsibly */
+}
+
+/* LOGO – RESPONSIVE SIZE */
+.topbar-logo {
+  height: clamp(2.25rem, 3vw, 3rem);
+  width: auto;
+  object-fit: contain;
+}
+
+/* TITLE + SUBTITLE WRAPPER */
+.topbar-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* MAIN TITLE – RESPONSIVE FONT */
+.topbar-title {
+  font-size: clamp(1.4rem, 2.3vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1;
+  color: #1d4ed8; /* blue-700/800 style */
+  letter-spacing: -0.03em;
+}
+
+/* SUBTITLE – RESPONSIVE, UPPERCASE */
+.topbar-subtitle {
+  margin-top: 0.2rem;
+  font-size: clamp(0.65rem, 1.1vw, 0.85rem);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #64748b;
+}
+
+/* RIGHT: USER AREA */
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+}
+
+/* USER TEXT */
+.topbar-username {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.topbar-username span span {
+  color: #0f172a;
+}
+
+/* LOGOUT BUTTON – CLEAN, NO ANIMATION (JUST HOVER TRANSITION) */
+.topbar-logout {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5f5;
+  background-color: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+}
+
+.topbar-logout:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
+}
+
+/* ----------------- RESPONSIVE BREAKPOINTS ----------------- */
+
+/* TABLETS / SMALL LAPTOPS */
+@media (max-width: 1024px) {
+  .topbar-inner {
+    padding-inline: 0.75rem;
+  }
+
+  .topbar-title {
+    font-size: clamp(1.3rem, 2.2vw, 1.6rem);
+  }
+
+  .topbar-subtitle {
+    letter-spacing: 0.14em;
+  }
+
+  .topbar-user {
+    gap: 0.5rem;
+  }
+
+  .topbar-username {
+    font-size: 0.8rem;
+  }
+}
+
+/* PHONES */
+@media (max-width: 768px) {
+  .topbar-inner {
+    flex-wrap: wrap;
+    align-items: center;
+    height: auto;
+    padding-block: 0.5rem;
+    row-gap: 0.5rem;
+  }
+
+  .topbar-brand {
+    flex: 1 1 60%;
+  }
+
+  .topbar-user {
+    flex: 1 1 40%;
+    justify-content: flex-end;
+  }
+
+  .topbar-logo {
+    height: clamp(2rem, 6vw, 2.5rem);
+  }
+
+  .topbar-title {
+    font-size: clamp(1.2rem, 4vw, 1.5rem);
+  }
+
+  .topbar-subtitle {
+    font-size: clamp(0.6rem, 1.7vw, 0.75rem);
+  }
+
+  .topbar-logout {
+    padding-inline: 0.75rem;
+  }
+}
+
+/* SMALL PHONES */
+@media (max-width: 480px) {
+  .topbar-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .topbar-brand {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .topbar-user {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Optionally hide subtitle on very small screens to save space */
+  .topbar-subtitle {
+    display: none;
+  }
+
+  .topbar-logo {
+    height: 2.1rem;
+  }
+
+  .topbar-title {
+    font-size: 1.25rem;
+  }
+
+  .topbar-username {
+    font-size: 0.78rem;
+  }
+
+  .topbar-logout {
+    font-size: 0.7rem;
+    padding-inline: 0.7rem;
+  }
+}
+
+.topbar-admin{
+    color: #00a00e;
+    border: 1px solid  #00a00e;
+    font-size: 0.7rem;
+    padding-inline: 0.7rem;
+    border-radius: 999px;
+    padding: 0.4rem 0.7rem;
+}
+.topbar-admin:hover{
+    background-color: #00a00e;
+    color: #ffffff;
+    transition: 0.2s ease-in-out;
+}

@@ -1,0 +1,111 @@
+/* Root fixed container for all popups */
+.popup-root {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  pointer-events: none; /* click-through except on card */
+}
+
+/* Popup card base styling */
+.popup-card {
+  position: relative;
+  min-width: 260px;
+  max-width: min(360px, 90vw);
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem 0.9rem 1rem;
+  border-radius: 0.9rem;
+  background-color: #0f172a; /* slate-900 style */
+  color: #e5e7eb;
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(148, 163, 184, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: auto; /* card is clickable */
+  transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Title & message */
+.popup-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.popup-message {
+  font-size: 0.8rem;
+  margin: 0;
+  color: #cbd5f5;
+}
+
+/* Close button (X) */
+.popup-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  border: none;
+  background: transparent;
+  color: #cbd5f5;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.1rem;
+  border-radius: 999px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.popup-close:hover {
+  background-color: rgba(148, 163, 184, 0.2);
+  color: #ffffff;
+}
+
+/* Hover feel */
+.popup-card:hover {
+  box-shadow:
+    0 14px 36px rgba(15, 23, 42, 0.45),
+    0 0 0 1px rgba(148, 163, 184, 0.55);
+}
+
+/* Types (colors like Tailwind palette) */
+.popup-info {
+  border-left: 3px solid #0ea5e9; /* sky-500 */
+}
+
+.popup-success {
+  border-left: 3px solid #22c55e; /* green-500 */
+}
+
+.popup-error {
+  border-left: 3px solid #ef4444; /* red-500 */
+}
+
+.popup-warning {
+  border-left: 3px solid #eab308; /* yellow-500 */
+}
+
+/* Make it look good on small screens */
+@media (max-width: 640px) {
+  .popup-root {
+    top: auto;
+    bottom: 0.75rem;
+    right: 0.5rem;
+    left: 0.5rem;
+  }
+
+  .popup-card {
+    max-width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.8rem 0.9rem 0.85rem 0.9rem;
+  }
+
+  .popup-title {
+    font-size: 0.85rem;
+  }
+
+  .popup-message {
+    font-size: 0.78rem;
+  }
+}
