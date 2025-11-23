@@ -20,9 +20,15 @@ const PaymentsPage = () => {
 
   const [customerLedgerId, setCustomerLedgerId] = useState('');
   const [supplierLedgerId, setSupplierLedgerId] = useState('');
-  const [customerLedger, setCustomerLedger] = useState(null);
-  const [supplierLedger, setSupplierLedger] = useState(null);
+  const [customerLedger, setCustomerLedger] = useState([]); // array of entries
+  const [supplierLedger, setSupplierLedger] = useState([]); // array of entries
   const [paymentHistory, setPaymentHistory] = useState([]);
+
+  // Dropdown data
+  const [customers, setCustomers] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+
+  // ---------- CHANGE HANDLERS ----------
 
   const handleCustomerPaymentChange = (e) => {
     const { name, value } = e.target;
@@ -40,11 +46,31 @@ const PaymentsPage = () => {
     }));
   };
 
+  // ---------- API CALLS: CREATE PAYMENTS ----------
+
   const submitCustomerPayment = async (e) => {
     e.preventDefault();
     try {
-      await axiosClient.post('/payments/customer', customerPayment);
+      const payload = {
+        ...customerPayment,
+        customer_id: Number(customerPayment.customer_id),
+        amount: Number(customerPayment.amount)
+      };
+
+      await axiosClient.post('/payments/customer', payload);
       alert('Customer payment recorded');
+
+      setCustomerPayment({
+        customer_id: '',
+        amount: '',
+        payment_date: '',
+        payment_method: 'cash',
+        notes: ''
+      });
+      await loadHistory();
+      if (customerLedgerId) {
+        await loadCustomerLedger(); // refresh ledger if same customer selected
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to record customer payment');
@@ -54,19 +80,41 @@ const PaymentsPage = () => {
   const submitSupplierPayment = async (e) => {
     e.preventDefault();
     try {
-      await axiosClient.post('/payments/supplier', supplierPayment);
+      const payload = {
+        ...supplierPayment,
+        supplier_id: Number(supplierPayment.supplier_id),
+        amount: Number(supplierPayment.amount)
+      };
+
+      await axiosClient.post('/payments/supplier', payload);
       alert('Supplier payment recorded');
+
+      setSupplierPayment({
+        supplier_id: '',
+        amount: '',
+        payment_date: '',
+        payment_mode: 'bank_transfer',
+        notes: ''
+      });
+      await loadHistory();
+      if (supplierLedgerId) {
+        await loadSupplierLedger(); // refresh ledger
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to record supplier payment');
     }
   };
 
+  // ---------- LEDGER LOADERS (array responses) ----------
+
   const loadCustomerLedger = async () => {
     if (!customerLedgerId) return;
     try {
       const res = await axiosClient.get(`/payments/customer/${customerLedgerId}`);
-      setCustomerLedger(res.data);
+      // response: { success, message, data: [ ...entries ] }
+      const entries = res.data?.data || [];
+      setCustomerLedger(entries);
     } catch (err) {
       console.error(err);
       alert('Failed to load customer ledger');
@@ -77,7 +125,9 @@ const PaymentsPage = () => {
     if (!supplierLedgerId) return;
     try {
       const res = await axiosClient.get(`/payments/supplier/${supplierLedgerId}`);
-      setSupplierLedger(res.data);
+      // response: { success, message, data: [ ...entries ] }
+      const entries = res.data?.data || [];
+      setSupplierLedger(entries);
     } catch (err) {
       console.error(err);
       alert('Failed to load supplier ledger');
@@ -87,80 +137,82 @@ const PaymentsPage = () => {
   const loadHistory = async () => {
     try {
       const res = await axiosClient.get('/payments/history');
-      setPaymentHistory(res.data || []);
+      // response: { success, message, data: [ ...history ] }
+      const list = res.data?.data || [];
+      setPaymentHistory(list);
     } catch (err) {
       console.error(err);
       alert('Failed to load payment history');
     }
   };
 
+  const loadCustomers = async () => {
+    try {
+      const res = await axiosClient.get('/customers', { params: { limit: 1000 } });
+      const raw = res.data?.data;
+      const list = Array.isArray(raw) ? raw : raw?.customers || [];
+      setCustomers(list);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load customers');
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const res = await axiosClient.get('/suppliers', { params: { limit: 1000 } });
+      const raw = res.data?.data;
+      const list = Array.isArray(raw) ? raw : raw?.suppliers || [];
+      setSuppliers(list);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load suppliers');
+    }
+  };
+
   useEffect(() => {
     loadHistory();
+    loadCustomers();
+    loadSuppliers();
   }, []);
 
-  // ------------------------- LEDGER RENDERER -------------------------
+  // ------------------------- LEDGER RENDERERS (array-based) -------------------------
 
-  const renderLedger = (ledger) => {
-    if (!ledger || typeof ledger !== "object") return null;
-
-    const person = ledger.customer || ledger.supplier;
+  const renderLedgerTable = (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return <p className="text-xs text-slate-500">No ledger entries found.</p>;
+    }
 
     return (
-      <div className="space-y-3 text-xs">
-
-        {/* PERSON DETAILS CARD */}
-        {person && (
-          <div className="bg-slate-50 border rounded p-3 space-y-1">
-            <h4 className="font-semibold text-slate-700">
-              {ledger.customer ? "Customer Details" : "Supplier Details"}
-            </h4>
-            <p><strong>Name:</strong> {person.name}</p>
-            <p><strong>Phone:</strong> {person.phone}</p>
-            <p><strong>Address:</strong> {person.address}</p>
-          </div>
-        )}
-
-        {/* OPENING BALANCE */}
-        {ledger.opening_balance !== undefined && (
-          <div className="bg-white border rounded p-3">
-            <strong>Opening Balance:</strong> Rs. {ledger.opening_balance}
-          </div>
-        )}
-
-        {/* TRANSACTIONS TABLE */}
-        {Array.isArray(ledger.transactions) && ledger.transactions.length > 0 && (
-          <div className="overflow-x-auto">
-            <h4 className="font-semibold text-slate-700 mb-1">Transactions</h4>
-            <table className="min-w-full text-xs border rounded">
-              <thead className="bg-slate-100 text-slate-600 uppercase text-[10px]">
-                <tr>
-                  <th className="px-2 py-1 border-b text-left">Type</th>
-                  <th className="px-2 py-1 border-b text-left">Amount</th>
-                  <th className="px-2 py-1 border-b text-left">Date</th>
-                  <th className="px-2 py-1 border-b text-left">Notes</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {ledger.transactions.map((t, i) => (
-                  <tr key={i} className="border-b hover:bg-slate-50">
-                    <td className="px-2 py-1">{t.type}</td>
-                    <td className="px-2 py-1">{t.amount}</td>
-                    <td className="px-2 py-1">{t.payment_date}</td>
-                    <td className="px-2 py-1">{t.notes || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* CLOSING BALANCE */}
-        {ledger.closing_balance !== undefined && (
-          <div className="bg-white border rounded p-3">
-            <strong>Closing Balance:</strong> Rs. {ledger.closing_balance}
-          </div>
-        )}
+      <div className="overflow-x-auto max-h-72 text-xs">
+        <table className="min-w-full border rounded">
+          <thead className="bg-slate-100 text-slate-600 uppercase text-[10px]">
+            <tr>
+              <th className="px-2 py-1 border-b text-left">ID</th>
+              <th className="px-2 py-1 border-b text-left">Type</th>
+              <th className="px-2 py-1 border-b text-left">Amount</th>
+              <th className="px-2 py-1 border-b text-left">Mode</th>
+              <th className="px-2 py-1 border-b text-left">Date</th>
+              <th className="px-2 py-1 border-b text-left">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((t) => (
+              <tr key={t.id} className="border-b hover:bg-slate-50">
+                <td className="px-2 py-1">{t.id}</td>
+                <td className="px-2 py-1">{t.payment_type || '—'}</td>
+                <td className="px-2 py-1">{t.amount}</td>
+                <td className="px-2 py-1">{t.payment_mode || '—'}</td>
+                <td className="px-2 py-1">
+                  {t.createdAt
+                    ? new Date(t.createdAt).toLocaleDateString()
+                    : '—'}
+                </td>
+                <td className="px-2 py-1">{t.notes || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -176,35 +228,56 @@ const PaymentsPage = () => {
         <table className="min-w-full border rounded">
           <thead className="bg-slate-100 text-slate-600 uppercase text-[10px]">
             <tr>
-              <th className="px-2 py-1 border-b text-left">Type</th>
               <th className="px-2 py-1 border-b text-left">ID</th>
+              <th className="px-2 py-1 border-b text-left">Type</th>
+              <th className="px-2 py-1 border-b text-left">Party</th>
               <th className="px-2 py-1 border-b text-left">Amount</th>
+              <th className="px-2 py-1 border-b text-left">Mode</th>
               <th className="px-2 py-1 border-b text-left">Date</th>
-              <th className="px-2 py-1 border-b text-left">Method</th>
               <th className="px-2 py-1 border-b text-left">Notes</th>
             </tr>
           </thead>
 
           <tbody>
-            {paymentHistory.map((p, idx) => (
-              <tr key={idx} className="border-b hover:bg-slate-50">
-                <td className="px-2 py-1">{p.type || '—'}</td>
-                <td className="px-2 py-1">{p.customer_id || p.supplier_id || '—'}</td>
-                <td className="px-2 py-1">{p.amount || '—'}</td>
-                <td className="px-2 py-1">{p.payment_date || '—'}</td>
-                <td className="px-2 py-1">
-                  {p.payment_method || p.payment_mode || '—'}
-                </td>
-                <td className="px-2 py-1">
-                  {p.notes ? <span>{p.notes}</span> : '—'}
-                </td>
-              </tr>
-            ))}
+            {paymentHistory.map((p) => {
+              const partyName =
+                p.customer?.name ||
+                p.supplier?.name ||
+                (p.payment_type === 'customer'
+                  ? `Customer #${p.customer_id}`
+                  : p.payment_type === 'supplier'
+                  ? `Supplier #${p.supplier_id}`
+                  : '—');
+
+              return (
+                <tr key={p.id} className="border-b hover:bg-slate-50">
+                  <td className="px-2 py-1">{p.id}</td>
+                  <td className="px-2 py-1">{p.payment_type || '—'}</td>
+                  <td className="px-2 py-1">{partyName}</td>
+                  <td className="px-2 py-1">{p.amount || '—'}</td>
+                  <td className="px-2 py-1">{p.payment_mode || p.payment_method || '—'}</td>
+                  <td className="px-2 py-1">
+                    {p.createdAt
+                      ? new Date(p.createdAt).toLocaleString()
+                      : p.payment_date || '—'}
+                  </td>
+                  <td className="px-2 py-1">{p.notes || '—'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     );
   };
+
+  // Helpers to show selected party name above ledger
+  const selectedCustomer = customers.find(
+    (c) => c.id === Number(customerLedgerId)
+  );
+  const selectedSupplier = suppliers.find(
+    (s) => s.id === Number(supplierLedgerId)
+  );
 
   // ----------------------------- PAGE UI -----------------------------
 
@@ -213,28 +286,35 @@ const PaymentsPage = () => {
       <header>
         <h2 className="text-xl font-semibold text-slate-900">Payments</h2>
         <p className="text-sm text-slate-600">
-          Manage customer receipts, supplier payments and ledgers.
+          Manage customer receipts, supplier payments, ledgers & history.
         </p>
       </header>
 
       {/* PAYMENT FORMS */}
       <section className="grid gap-4 md:grid-cols-2">
-        
         {/* CUSTOMER PAYMENT */}
         <section className="bg-white rounded-xl shadow-sm border p-4">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">Customer Payment</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">
+            Customer Payment
+          </h3>
 
           <form className="space-y-3" onSubmit={submitCustomerPayment}>
             <div>
-              <label className="text-xs font-medium">Customer ID</label>
-              <input
-                type="number"
+              <label className="text-xs font-medium">Customer</label>
+              <select
                 name="customer_id"
                 value={customerPayment.customer_id}
                 onChange={handleCustomerPaymentChange}
                 required
-                className="w-full"
-              />
+                className="w-full border px-2 py-1 text-sm rounded"
+              >
+                <option value="">Select customer</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.phone ? `(${c.phone})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -299,19 +379,27 @@ const PaymentsPage = () => {
 
         {/* SUPPLIER PAYMENT */}
         <section className="bg-white rounded-xl shadow-sm border p-4">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">Supplier Payment</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">
+            Supplier Payment
+          </h3>
 
           <form className="space-y-3" onSubmit={submitSupplierPayment}>
             <div>
-              <label className="text-xs font-medium">Supplier ID</label>
-              <input
-                type="number"
+              <label className="text-xs font-medium">Supplier</label>
+              <select
                 name="supplier_id"
                 value={supplierPayment.supplier_id}
                 onChange={handleSupplierPaymentChange}
                 required
-                className="w-full"
-              />
+                className="w-full border px-2 py-1 text-sm rounded"
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.phone ? `(${s.phone})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -377,19 +465,33 @@ const PaymentsPage = () => {
 
       {/* LEDGERS */}
       <section className="grid gap-4 md:grid-cols-2">
-        
         {/* CUSTOMER LEDGER */}
         <section className="bg-white rounded-xl shadow-sm border p-4 space-y-2">
-          <header className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Customer Ledger</h3>
+          <header className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">
+                Customer Ledger
+              </h3>
+              {selectedCustomer && (
+                <p className="text-[11px] text-slate-500">
+                  {selectedCustomer.name}{' '}
+                  {selectedCustomer.phone ? `· ${selectedCustomer.phone}` : ''}
+                </p>
+              )}
+            </div>
             <div className="flex gap-2 items-center">
-              <input
-                type="number"
-                placeholder="Customer ID"
+              <select
                 value={customerLedgerId}
                 onChange={(e) => setCustomerLedgerId(e.target.value)}
-                className="w-24 border px-2 py-1 text-xs"
-              />
+                className="border px-2 py-1 text-xs rounded"
+              >
+                <option value="">Select customer</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.phone ? `(${c.phone})` : ''}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={loadCustomerLedger}
@@ -400,21 +502,36 @@ const PaymentsPage = () => {
             </div>
           </header>
 
-          {customerLedger && renderLedger(customerLedger)}
+          {renderLedgerTable(customerLedger)}
         </section>
 
         {/* SUPPLIER LEDGER */}
         <section className="bg-white rounded-xl shadow-sm border p-4 space-y-2">
-          <header className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Supplier Ledger</h3>
+          <header className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">
+                Supplier Ledger
+              </h3>
+              {selectedSupplier && (
+                <p className="text-[11px] text-slate-500">
+                  {selectedSupplier.name}{' '}
+                  {selectedSupplier.phone ? `· ${selectedSupplier.phone}` : ''}
+                </p>
+              )}
+            </div>
             <div className="flex gap-2 items-center">
-              <input
-                type="number"
-                placeholder="Supplier ID"
+              <select
                 value={supplierLedgerId}
                 onChange={(e) => setSupplierLedgerId(e.target.value)}
-                className="w-24 border px-2 py-1 text-xs"
-              />
+                className="border px-2 py-1 text-xs rounded"
+              >
+                <option value="">Select supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.phone ? `(${s.phone})` : ''}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={loadSupplierLedger}
@@ -425,14 +542,16 @@ const PaymentsPage = () => {
             </div>
           </header>
 
-          {supplierLedger && renderLedger(supplierLedger)}
+          {renderLedgerTable(supplierLedger)}
         </section>
       </section>
 
-      {/* PAYMENT HISTORY */}
+      {/* PAYMENT HISTORY (FULL) */}
       <section className="bg-white rounded-xl shadow-sm border p-4">
         <header className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-slate-800">Payments History</h3>
+          <h3 className="text-sm font-semibold text-slate-800">
+            Payments History
+          </h3>
           <button
             type="button"
             onClick={loadHistory}

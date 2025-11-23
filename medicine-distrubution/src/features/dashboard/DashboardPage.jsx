@@ -4,7 +4,9 @@ import axiosClient from '../../api/axiosClient.js';
 const DashboardCard = ({ title, value, subtitle }) => (
   <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
     <header className="mb-1">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">{title}</h3>
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+        {title}
+      </h3>
     </header>
     <p className="text-2xl font-semibold text-slate-900">{value}</p>
     {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
@@ -19,9 +21,13 @@ const DashboardPage = () => {
     setLoading(true);
     try {
       const res = await axiosClient.get('/dashboard/summary');
-      setSummary(res.data);
+
+      const api = res.data?.data ?? {};
+
+      // Set API data directly (no manual mapping needed)
+      setSummary(api);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load dashboard summary:', err);
     } finally {
       setLoading(false);
     }
@@ -44,29 +50,30 @@ const DashboardPage = () => {
 
       {summary && (
         <section className="grid gap-4 grid-cols-1 md:grid-cols-3">
-          <DashboardCard
-            title="Total Stock Value"
-            value={summary.total_stock_value ?? '-'}
+
+          <DashboardCard title="Total Sales" value={summary.totalSales ?? '-'} />
+          <DashboardCard title="Total Purchases" value={summary.totalPurchases ?? '-'} />
+          <DashboardCard title="Today's Revenue" value={summary.todaysRevenue ?? '-'} />
+          <DashboardCard title="Stock Valuation" value={summary.stockValuation ?? '-'} />
+          <DashboardCard title="Low Stock Items" value={summary.lowStockCount ?? '-'} />
+          <DashboardCard title="Near Expiry Batches" value={summary.nearExpiryCount ?? '-'} />
+          <DashboardCard title="Outstanding Customer Balance" value={summary.outstandingCustomerBalance ?? '-'} />
+          <DashboardCard title="Outstanding Supplier Balance" value={summary.outstandingSupplierBalance ?? '-'} />
+          <DashboardCard title="Total Products" value={summary.totalProducts ?? '-'} />
+          <DashboardCard title="Total Customers" value={summary.totalCustomers ?? '-'} />
+          <DashboardCard title="Total Suppliers" value={summary.totalSuppliers ?? '-'} />
+          
+          {/* Optionally show list or count of lowStockProducts */}
+          <DashboardCard 
+            title="Low Stock Products" 
+            value={summary.lowStockProducts?.length ?? '-'} 
+            subtitle={summary.lowStockProducts?.length ? 'See details below' : ''} 
           />
-          <DashboardCard
-            title="Today Sales"
-            value={summary.today_sales ?? '-'}
-          />
-          <DashboardCard
-            title="Pending Customer Payments"
-            value={summary.pending_customer_payments ?? '-'}
-          />
-          <DashboardCard
-            title="Pending Purchase Payments"
-            value={summary.pending_purchase_payments ?? '-'}
-          />
-          <DashboardCard
-            title="Low Stock Items"
-            value={summary.low_stock_count ?? '-'}
-          />
-          <DashboardCard
-            title="Near Expiry Batches"
-            value={summary.near_expiry_count ?? '-'}
+
+          {/* Show timestamp */}
+          <DashboardCard 
+            title="As Of" 
+            value={summary.asOf ? new Date(summary.asOf).toLocaleString() : '-'} 
           />
         </section>
       )}

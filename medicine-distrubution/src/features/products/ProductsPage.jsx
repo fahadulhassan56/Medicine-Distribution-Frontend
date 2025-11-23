@@ -22,11 +22,30 @@ const ProductsPage = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const loadProducts = async () => {
+  // pagination state from API
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1
+  });
+
+  const loadProducts = async (page = 1) => {
     setLoading(true);
     try {
-      const res = await axiosClient.get('/products');
-      setProducts(res.data?.data || []);
+      const res = await axiosClient.get('/products', {
+        params: { page, limit: pagination.limit }
+      });
+
+      const api = res.data?.data || {};
+
+      setProducts(api.products || []);
+      setPagination({
+        page: api.page || 1,
+        limit: api.limit || 10,
+        total: api.total || 0,
+        totalPages: api.totalPages || 1
+      });
     } catch (err) {
       console.error(err);
       alert('Failed to load products');
@@ -36,7 +55,8 @@ const ProductsPage = () => {
   };
 
   useEffect(() => {
-    loadProducts();
+    loadProducts(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -75,7 +95,7 @@ const ProductsPage = () => {
     if (!confirm('Delete this product?')) return;
     try {
       await axiosClient.delete(`/products/${id}`);
-      await loadProducts();
+      await loadProducts(pagination.page);
     } catch (err) {
       console.error(err);
       alert('Failed to delete product');
@@ -92,19 +112,58 @@ const ProductsPage = () => {
       }
       setForm(emptyProduct);
       setEditingId(null);
-      await loadProducts();
+      await loadProducts(pagination.page);
     } catch (err) {
       console.error(err);
       alert('Failed to save product');
     }
   };
 
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > pagination.totalPages) return;
+    loadProducts(newPage);
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return value;
+    }
+  };
+
   const columns = [
+    { key: 'id', label: 'ID' },
     { key: 'product_name', label: 'Product' },
     { key: 'generic_name', label: 'Generic' },
     { key: 'form', label: 'Form' },
     { key: 'strength', label: 'Strength' },
+    { key: 'packing', label: 'Packing' },
+    { key: 'barcode', label: 'Barcode' },
     { key: 'mrp', label: 'MRP' },
+    { key: 'purchase_price', label: 'Purchase Price' },
+    { key: 'selling_price', label: 'Selling Price' },
+    {
+      key: 'is_prescription_required',
+      label: 'Prescription Required',
+      render: (value) => (value ? 'Yes' : 'No')
+    },
+    {
+      key: 'is_controlled',
+      label: 'Controlled',
+      render: (value) => (value ? 'Yes' : 'No')
+    },
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      render: (value) => formatDateTime(value)
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated At',
+      render: (value) => formatDateTime(value)
+    },
     {
       key: 'actions',
       label: 'Actions',
@@ -139,9 +198,15 @@ const ProductsPage = () => {
     <main className="space-y-4">
       <header className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Products (Medicines)</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            Products (Medicines)
+          </h2>
           <p className="text-sm text-slate-600">
             Maintain medicine master data as per system documentation.
+          </p>
+          {/* show overall list info from API */}
+          <p className="text-xs text-slate-500 mt-1">
+            Page {pagination.page} of {pagination.totalPages} — Total products: {pagination.total}
           </p>
         </div>
       </header>
@@ -192,7 +257,9 @@ const ProductsPage = () => {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Form</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              Form
+            </label>
             <input
               name="form"
               value={form.form}
@@ -202,7 +269,9 @@ const ProductsPage = () => {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Packing</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              Packing
+            </label>
             <input
               name="packing"
               value={form.packing}
@@ -212,7 +281,9 @@ const ProductsPage = () => {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Barcode</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              Barcode
+            </label>
             <input
               name="barcode"
               value={form.barcode}
@@ -222,7 +293,9 @@ const ProductsPage = () => {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">MRP</label>
+            <label className="text-xs font-medium text-slate-700 block mb-1">
+              MRP
+            </label>
             <input
               name="mrp"
               type="number"
@@ -282,7 +355,10 @@ const ProductsPage = () => {
               checked={form.is_controlled}
               onChange={handleChange}
             />
-            <label htmlFor="is_controlled" className="text-xs font-medium text-slate-700">
+            <label
+              htmlFor="is_controlled"
+              className="text-xs font-medium text-slate-700"
+            >
               Controlled Medicine
             </label>
           </div>
@@ -310,11 +386,39 @@ const ProductsPage = () => {
         </form>
       </section>
 
-      <section aria-label="Products list">
+      <section aria-label="Products list" className="space-y-2">
         {loading ? (
           <p className="text-sm text-slate-500">Loading products…</p>
         ) : (
-          <DataTable columns={columns} data={products} />
+          <>
+            <DataTable columns={columns} data={products} />
+
+            {/* Pagination controls */}
+            <div className="flex items-center justify-between mt-2 text-xs text-slate-600">
+              <div>
+                Showing page {pagination.page} of {pagination.totalPages} — Total:{' '}
+                {pagination.total}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                  className="px-2 py-1 border border-slate-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages}
+                  className="px-2 py-1 border border-slate-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </section>
     </main>
